@@ -1,0 +1,77 @@
+name: Build APK
+
+# When this workflow runs:
+# - When you click "Run workflow" button manually
+# - When you push changes to main branch
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Step 1: Get the project files
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Step 3: Setup Java (required for Android build)
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Step 4: Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Step 5: Install Capacitor + dependencies
+      - name: Install dependencies
+        run: |
+          npm install
+          npm install -g @capacitor/cli
+
+      # Step 6: Add Android platform (creates the native Android project)
+      - name: Add Android platform
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap sync android
+
+      # Step 7: Make gradlew executable
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      # Step 8: Build the APK
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      # Step 9: Upload the APK as a downloadable artifact
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      # Step 10: Print success message with download instructions
+      - name: Build summary
+        run: |
+          echo "## ✅ APK Built Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download your APK from the **Artifacts** section below." >> $GITHUB_STEP_SUMMARY
+          echo "Look for **forge-app-debug** zip file." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Extract the zip and you'll find **app-debug.apk** inside." >> $GITHUB_STEP_SUMMARY
